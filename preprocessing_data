@@ -1,0 +1,91 @@
+import pandas as pd
+import nltk
+import numpy as np
+import string
+import re
+!pip install Sastrawi
+from nltk.tokenize import TweetTokenizer
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+nltk.download('stopwords')
+from nltk.corpus import stopwords 
+
+from google.colab import files
+uploaded=files.upload()
+
+import io
+def load_data():
+  data = pd.read_excel('dataset.xlsx')
+  return data
+berita_df = load_data()
+berita_df.head()
+df = pd.DataFrame(berita_df[['text','label']])
+df
+
+#Cleansing Data
+def cleansing(text):
+    text = text.translate(str.maketrans("","",string.punctuation))
+
+    text = text.strip()
+
+    text =text.encode('ascii', 'ignore').decode() #hapus emot/karakter
+    text =re.sub(r'https*\S+', ' ', text) # Remove URL
+    text =re.sub(r'@\S+', ' ', text) # Remove mentions
+    text =re.sub(r'rt', ' ', text) # Remove URL
+    text =re.sub(r'#\S+', ' ', text) # Remove Hashtags
+    text =re.sub(r'\'\w+', '', text) #hapus karakter
+    text =re.sub(r'\s{2,}', ' ', text) #hapus spasi berlebih
+    text =re.sub('rt', ' ', text) #hapus rt
+    text = re.sub('[0-9]+', '', text) # Case Folding: Removing Number
+    text =re.sub(r"#", " <hash_tag> ",text)
+    
+    pisah = text.split()
+
+
+    return text
+df['clean'] = df['text'].apply(lambda x:cleansing(x))
+df
+#####
+
+#Case Folding
+df['lowertext'] = df['clean'].str.lower()
+df
+#####
+
+#Tokenizing
+def tokenization(text):
+    tokenizer = TweetTokenizer(preserve_case=False, strip_handles=True, reduce_len=True)
+    tweet_tokens = tokenizer.tokenize(text)
+    return tweet_tokens
+df['tokenizing']= df['lowertext'].apply(lambda x: tokenization(x))
+
+df.head()
+#####
+
+#Stemming
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()
+
+def stemming(text):
+    stem_word = [stemmer.stem(word) for word in text]# stemming word
+    return stem_word
+df['stemming']=df['tokenizing'].apply(lambda x: stemming(x))
+
+df.head()
+#####
+
+#Stopword Removal
+stopwords_indonesia = stopwords.words('indonesian')
+
+def remove_stopwords(text):
+    output= " ".join([i for i in text if i not in stopwords_indonesia])
+    return output
+
+df['Berita']= df['stemming'].apply(lambda x:remove_stopwords(x))
+
+df.head(10)
+#####
+
+df.drop(df.columns[[0,2,3,4,5]], axis=1, inplace = True)
+df
+df.groupby('label').count()
+df.to_excel('dataclean.xlsx',encoding='utf8', index=False)
